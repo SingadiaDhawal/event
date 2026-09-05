@@ -1,5 +1,5 @@
 // ============================================================
-// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC
+// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC (WITH ALERTS)
 // ============================================================
 
 let selectedBlob = null;
@@ -38,10 +38,12 @@ function handleFile(event) {
   document.getElementById("find-button").disabled = false;
 
   hideError();
+  hideAlert();
 }
 
 async function startCamera() {
   hideError();
+  hideAlert();
   try {
     stopCamera();
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -83,6 +85,7 @@ function capturePhoto() {
       document.getElementById("preview-image").src = URL.createObjectURL(blob);
       document.getElementById("upload-preview").style.display = "block";
       hideError();
+      hideAlert();
     },
     "image/jpeg",
     0.92
@@ -102,6 +105,7 @@ function getSelectedGalleryUrl() {
 
 async function startSearch() {
   hideError();
+  hideAlert();
 
   if (!selectedBlob) {
     showError("Please upload or capture a photo first.");
@@ -127,7 +131,7 @@ async function startSearch() {
   document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
-  document.getElementById("status-text").innerText = "Checking folder index & connecting...";
+  document.getElementById("status-text").innerText = "Connecting & checking folder index...";
   document.getElementById("progress-bar").style.width = "10%";
 
   try {
@@ -165,6 +169,11 @@ async function pollJob() {
 
     document.getElementById("status-text").innerText = job.message || "Processing photos...";
     document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
+
+    // Handle truncation warnings sent from backend
+    if (job.message && job.message.includes("Note: Folder contains")) {
+      showAlert(job.message);
+    }
 
     if (job.status === "completed") {
       showResults(job);
@@ -250,6 +259,8 @@ function startAgain() {
   updateGallerySource();
   stopCamera();
   switchTab("upload");
+  hideAlert();
+  hideError();
 }
 
 function showError(message) {
@@ -260,4 +271,14 @@ function showError(message) {
 
 function hideError() {
   document.getElementById("error").style.display = "none";
+}
+
+function showAlert(message) {
+  const element = document.getElementById("alert-box");
+  element.innerText = message;
+  element.style.display = "block";
+}
+
+function hideAlert() {
+  document.getElementById("alert-box").style.display = "none";
 }

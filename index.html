@@ -81,6 +81,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .progress-bar { height: 100%; width: 0%; background: #111827; transition: width 0.3s; }
 
 .error { display: none; margin-top: 20px; padding: 16px; border-radius: 15px; background: #fef2f2; color: #b91c1c; }
+.alert-box { display: none; margin-top: 20px; padding: 16px; border-radius: 15px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 14px; font-weight: 600; text-align: center; }
 
 .results { display: none; margin-top: 25px; }
 .results-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -175,7 +176,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         <input type="url" id="gallery-url-input" placeholder="https://drive.google.com/drive/folders/...">
         <div class="gallery-hint">
           The folder must be shared as "Anyone with the link → Viewer".
-          First-time indexing extracts face signatures. Subsequent searches check for updates automatically.
+          Folders exceeding 150 images will be automatically truncated.
         </div>
       </div>
     </div>
@@ -189,6 +190,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
 
     <div class="error" id="error"></div>
+    <div class="alert-box" id="alert-box"></div>
   </div>
 
   <div class="results" id="results">
