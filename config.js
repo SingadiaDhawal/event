@@ -1,19 +1,8 @@
-// ============================================================
-// EVENT PHOTO FINDER — FRONTEND CONFIG
-//
-// This is the ONLY file that changes when the Colab backend
-// restarts and gets a new Cloudflare Quick Tunnel URL.
-//
-// index.html / app.js never need to change.
-// ============================================================
+// Auto-updated by the Colab backend on 2026-09-05 10:59:13.
+// Do not edit BACKEND_URL by hand — it changes every time Colab restarts.
 
 const CONFIG = {
-
-  // Paste the current Cloudflare Quick Tunnel URL printed by
-  // the Colab notebook (Cell: "START CLOUDFLARE QUICK TUNNEL").
-  BACKEND_URL: "https://words-qualifying-possible-strictly.trycloudflare.com",
-
+  BACKEND_URL: "https://vii-wichita-reviewed-katrina.trycloudflare.com",
   APP_NAME: "Find Your Photos",
-
   MAX_UPLOAD_MB: 15
 };
