@@ -105,6 +105,25 @@ function capturePhoto() {
 }
 
 // ------------------------------------------------------------
+// GALLERY SOURCE (this event's gallery vs. a custom Drive link)
+// ------------------------------------------------------------
+
+function updateGallerySource() {
+  const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
+  document.getElementById("custom-gallery-input").style.display = isCustom ? "block" : "none";
+}
+
+function getSelectedGalleryUrl() {
+  const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
+
+  if (!isCustom) {
+    return "";
+  }
+
+  return document.getElementById("gallery-url-input").value.trim();
+}
+
+// ------------------------------------------------------------
 // SEARCH
 // ------------------------------------------------------------
 
@@ -121,6 +140,17 @@ async function startSearch() {
     return;
   }
 
+  const galleryUrl = getSelectedGalleryUrl();
+  const usingCustomGallery = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
+
+  if (usingCustomGallery) {
+    const drivePattern = /^https:\/\/drive\.google\.com\/drive\/folders\/[a-zA-Z0-9_-]+/;
+    if (!drivePattern.test(galleryUrl)) {
+      showError("Please paste a valid Google Drive folder link (https://drive.google.com/drive/folders/...).");
+      return;
+    }
+  }
+
   document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
@@ -130,6 +160,10 @@ async function startSearch() {
   try {
     const formData = new FormData();
     formData.append("selfie", selectedBlob, "selfie.jpg");
+
+    if (usingCustomGallery) {
+      formData.append("gallery_url", galleryUrl);
+    }
 
     const response = await fetch(API_BASE + "/api/start-scan", {
       method: "POST",
@@ -256,6 +290,10 @@ function startAgain() {
 
   document.getElementById("find-button").disabled = true;
   document.getElementById("upload-preview").style.display = "none";
+
+  document.querySelector('input[name="gallery-source"][value="default"]').checked = true;
+  document.getElementById("gallery-url-input").value = "";
+  updateGallerySource();
 
   stopCamera();
   switchTab("upload");

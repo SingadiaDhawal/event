@@ -99,6 +99,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .empty { padding: 40px 20px; text-align: center; color: #64748b; }
 
+.gallery-source { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+.gallery-source-label { font-size: 13px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+.gallery-options { display: flex; flex-direction: column; gap: 8px; }
+.gallery-option { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #334155; cursor: pointer; }
+.gallery-option input[type="radio"] { accent-color: #111827; width: 16px; height: 16px; }
+.custom-gallery-input { margin-top: 12px; }
+.custom-gallery-input input[type="url"] {
+  width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #cbd5e1;
+  font-size: 14px; font-family: inherit;
+}
+.custom-gallery-input input[type="url"]:focus { outline: 2px solid #6366f1; border-color: transparent; }
+.gallery-hint { margin-top: 8px; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+
 @media (max-width: 600px) {
   .page { padding: 12px 12px 40px; }
   .card { padding: 18px; border-radius: 20px; }
@@ -142,6 +155,27 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         <div class="camera-buttons">
           <button class="secondary" type="button" onclick="startCamera()">Start Camera</button>
           <button class="secondary" type="button" onclick="capturePhoto()">Capture</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="gallery-source">
+      <div class="gallery-source-label">Photos to search</div>
+      <div class="gallery-options">
+        <label class="gallery-option">
+          <input type="radio" name="gallery-source" value="default" checked onchange="updateGallerySource()">
+          Use this event's gallery
+        </label>
+        <label class="gallery-option">
+          <input type="radio" name="gallery-source" value="custom" onchange="updateGallerySource()">
+          Search my own Google Drive folder instead
+        </label>
+      </div>
+      <div class="custom-gallery-input" id="custom-gallery-input" style="display:none;">
+        <input type="url" id="gallery-url-input" placeholder="https://drive.google.com/drive/folders/...">
+        <div class="gallery-hint">
+          The folder must be shared as "Anyone with the link → Viewer".
+          First-time searches on a new folder take longer since photos are scanned fresh.
         </div>
       </div>
     </div>

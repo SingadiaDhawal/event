@@ -131,6 +131,31 @@ Never paste the token directly into the notebook or commit it to the repo.
 4. Every time Colab disconnects and you need to bring it back, just
    reopen the notebook and *Run all* again — same process repeats.
 
+## Letting visitors search their own Google Drive folder
+
+The site now has a second option beyond "search this event's gallery":
+a visitor can paste their own public Google Drive folder link and search
+that instead. This is handled carefully because it runs an arbitrary,
+customer-supplied download on your Colab server:
+
+- Only real `https://drive.google.com/drive/folders/...` links are accepted
+  (checked on both the frontend and backend).
+- Only the first **150** images found in the folder are scanned
+  (`MAX_CUSTOM_GALLERY_IMAGES` in the backend script).
+- A simple per-IP limit allows **3 custom-gallery searches per 10 minutes**
+  (`CUSTOM_GALLERY_RATE_LIMIT_*` in the backend script).
+- Custom galleries are **not** added to your permanent index or pushed to
+  GitHub — they're downloaded fresh, scanned, and then their files are
+  deleted automatically ~30 minutes after the search finishes.
+- Because nothing is precomputed for a custom folder, these searches are
+  noticeably slower than searching the event's own indexed gallery
+  (every photo has to be detected and embedded on the spot).
+
+If you don't want this option exposed at all, remove the "Search my own
+Google Drive folder instead" radio button and its input from `index.html`
+— the backend route still works either way and simply defaults to the
+event's own gallery when no `gallery_url` is sent.
+
 ## Rebuilding the index after adding photos
 
 The precomputed index only knows about the photos it was built from.
