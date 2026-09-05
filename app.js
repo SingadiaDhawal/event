@@ -1,5 +1,5 @@
 // ============================================================
-// EVENT PHOTO FINDER — FRONTEND LOGIC
+// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC
 // ============================================================
 
 let selectedBlob = null;
@@ -11,10 +11,6 @@ const API_BASE = String(CONFIG.BACKEND_URL || "").replace(/\/+$/, "");
 
 document.getElementById("file-input").addEventListener("change", handleFile);
 
-// ------------------------------------------------------------
-// TABS
-// ------------------------------------------------------------
-
 function switchTab(tab) {
   const isUpload = tab === "upload";
 
@@ -25,21 +21,17 @@ function switchTab(tab) {
 
   if (!isUpload) {
     document.getElementById("camera-box").style.display = "block";
+    startCamera();
   } else {
     stopCamera();
   }
 }
-
-// ------------------------------------------------------------
-// FILE UPLOAD
-// ------------------------------------------------------------
 
 function handleFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
   selectedBlob = file;
-
   const url = URL.createObjectURL(file);
   document.getElementById("preview-image").src = url;
   document.getElementById("upload-preview").style.display = "block";
@@ -48,24 +40,17 @@ function handleFile(event) {
   hideError();
 }
 
-// ------------------------------------------------------------
-// CAMERA
-// ------------------------------------------------------------
-
 async function startCamera() {
   hideError();
-
   try {
     stopCamera();
-
     cameraStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" },
       audio: false
     });
-
     document.getElementById("video").srcObject = cameraStream;
   } catch (error) {
-    showError("Unable to access the camera. Please allow camera permission or upload a photo instead.");
+    showError("Unable to access the camera. Please allow permissions or upload a photo.");
   }
 }
 
@@ -104,10 +89,6 @@ function capturePhoto() {
   );
 }
 
-// ------------------------------------------------------------
-// GALLERY SOURCE (this event's gallery vs. a custom Drive link)
-// ------------------------------------------------------------
-
 function updateGallerySource() {
   const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
   document.getElementById("custom-gallery-input").style.display = isCustom ? "block" : "none";
@@ -115,17 +96,9 @@ function updateGallerySource() {
 
 function getSelectedGalleryUrl() {
   const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
-
-  if (!isCustom) {
-    return "";
-  }
-
+  if (!isCustom) return "";
   return document.getElementById("gallery-url-input").value.trim();
 }
-
-// ------------------------------------------------------------
-// SEARCH
-// ------------------------------------------------------------
 
 async function startSearch() {
   hideError();
@@ -135,8 +108,8 @@ async function startSearch() {
     return;
   }
 
-  if (!API_BASE || API_BASE.indexOf("YOUR-CURRENT-COLAB-URL") !== -1) {
-    showError("The photo search server is not configured yet. Please try again shortly.");
+  if (!API_BASE) {
+    showError("Backend URL is not configured in config.js.");
     return;
   }
 
@@ -146,7 +119,7 @@ async function startSearch() {
   if (usingCustomGallery) {
     const drivePattern = /^https:\/\/drive\.google\.com\/drive\/folders\/[a-zA-Z0-9_-]+/;
     if (!drivePattern.test(galleryUrl)) {
-      showError("Please paste a valid Google Drive folder link (https://drive.google.com/drive/folders/...).");
+      showError("Please paste a valid Google Drive folder link.");
       return;
     }
   }
@@ -154,8 +127,8 @@ async function startSearch() {
   document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
-  document.getElementById("status-text").innerText = "Connecting to photo finder...";
-  document.getElementById("progress-bar").style.width = "5%";
+  document.getElementById("status-text").innerText = "Checking folder index & connecting...";
+  document.getElementById("progress-bar").style.width = "10%";
 
   try {
     const formData = new FormData();
@@ -170,20 +143,15 @@ async function startSearch() {
       body: formData
     });
 
-    if (!response.ok) {
-      throw new Error("Backend request failed.");
-    }
+    if (!response.ok) throw new Error("Server rejected the request.");
 
     const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.message || "Unable to start search.");
-    }
+    if (!data.success) throw new Error(data.message || "Failed to start scan.");
 
     currentJobId = data.job_id;
     pollJob();
   } catch (error) {
-    showError(error.message || "The photo search server is currently unavailable.");
+    showError(error.message || "Connection failed.");
     resetToInput();
   }
 }
@@ -191,14 +159,11 @@ async function startSearch() {
 async function pollJob() {
   try {
     const response = await fetch(API_BASE + "/api/job/" + encodeURIComponent(currentJobId));
-
-    if (!response.ok) {
-      throw new Error("Unable to read search status.");
-    }
+    if (!response.ok) throw new Error("Lost connection to job queue.");
 
     const job = await response.json();
 
-    document.getElementById("status-text").innerText = job.message || "Searching...";
+    document.getElementById("status-text").innerText = job.message || "Processing photos...";
     document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
 
     if (job.status === "completed") {
@@ -207,12 +172,12 @@ async function pollJob() {
     }
 
     if (job.status === "error") {
-      throw new Error(job.message || "Search failed.");
+      throw new Error(job.message || "Processing encountered an error.");
     }
 
-    pollTimer = setTimeout(pollJob, 500);
+    pollTimer = setTimeout(pollJob, 600);
   } catch (error) {
-    showError(error.message || "Something went wrong.");
+    showError(error.message || "An error occurred during search polling.");
     resetToInput();
   }
 }
@@ -227,24 +192,18 @@ function resetToInput() {
   document.getElementById("find-button").disabled = false;
 }
 
-// ------------------------------------------------------------
-// RESULTS
-// ------------------------------------------------------------
-
 function showResults(job) {
   document.getElementById("status").style.display = "none";
   document.getElementById("results").style.display = "block";
 
   const results = job.results || [];
-
-  document.getElementById("results-count").innerText = results.length + " matching photos";
+  document.getElementById("results-count").innerText = results.length + " matching photos found";
 
   const gallery = document.getElementById("gallery");
   gallery.innerHTML = "";
 
   if (results.length === 0) {
-    gallery.innerHTML =
-      '<div class="empty">We couldn\'t find a matching photo. Try another clear selfie.</div>';
+    gallery.innerHTML = '<div class="empty">No matching photos found. Try a clearer selfie.</div>';
     return;
   }
 
@@ -255,7 +214,7 @@ function showResults(job) {
     const image = document.createElement("img");
     image.src = API_BASE + "/api/image/" + encodeURIComponent(currentJobId) + "/" + index;
     image.loading = "lazy";
-    image.alt = "Matched event photo";
+    image.alt = "Matched photo";
 
     const info = document.createElement("div");
     info.className = "photo-info";
@@ -272,10 +231,8 @@ function showResults(job) {
 
     info.appendChild(name);
     info.appendChild(download);
-
     card.appendChild(image);
     card.appendChild(info);
-
     gallery.appendChild(card);
   });
 }
@@ -284,24 +241,16 @@ function startAgain() {
   document.getElementById("results").style.display = "none";
   document.getElementById("input-card").style.display = "block";
   document.getElementById("file-input").value = "";
-
   selectedBlob = null;
   currentJobId = null;
-
   document.getElementById("find-button").disabled = true;
   document.getElementById("upload-preview").style.display = "none";
-
   document.querySelector('input[name="gallery-source"][value="default"]').checked = true;
   document.getElementById("gallery-url-input").value = "";
   updateGallerySource();
-
   stopCamera();
   switchTab("upload");
 }
-
-// ------------------------------------------------------------
-// ERRORS
-// ------------------------------------------------------------
 
 function showError(message) {
   const element = document.getElementById("error");
