@@ -128,11 +128,14 @@ async function startSearch() {
     }
   }
 
+  // Display loader immediately and yield control so the browser paints the UI changes
   document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
   document.getElementById("status-text").innerText = "Connecting & checking folder index...";
   document.getElementById("progress-bar").style.width = "10%";
+
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
     const formData = new FormData();
@@ -167,7 +170,6 @@ async function pollJob() {
 
     const job = await response.json();
 
-    // Dynamically update UI progress bar and status text from backend states
     document.getElementById("status-text").innerText = job.message || "Processing photos...";
     document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
 
