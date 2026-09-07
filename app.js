@@ -1,95 +1,137 @@
-// ============================================================
-// EVENT PHOTO FINDER — MULTI-STAGE PROGRESS LOGIC
-// ============================================================
-
-let selectedBlob = null;
+let selectedFiles = []; 
 let currentJobId = null;
 let cameraStream = null;
-let pollTimer = null;
+let useFrontCamera = true;
+let isMultiUpload = false;
+let isMultiCam = false;
+
+const guideSteps = [
+  { pose: "front", label: "Look Straight Ahead" },
+  { pose: "left", label: "Turn Slightly Left" },
+  { pose: "right", label: "Turn Slightly Right" },
+  { pose: "up", label: "Tilt Chin Up" },
+  { pose: "down", label: "Tilt Chin Down" }
+];
+let currentStepIndex = 0;
+let guidedBlobs = [];
 
 const API_BASE = String(CONFIG.BACKEND_URL || "").replace(/\/+$/, "");
 
-document.getElementById("file-input").addEventListener("change", handleFile);
+document.getElementById("file-input").addEventListener("change", handleFileSelect);
 
 function switchTab(tab) {
   const isUpload = tab === "upload";
-
   document.getElementById("upload-tab").classList.toggle("active", isUpload);
   document.getElementById("camera-tab").classList.toggle("active", !isUpload);
   document.getElementById("upload-content").classList.toggle("active", isUpload);
   document.getElementById("camera-content").classList.toggle("active", !isUpload);
 
   if (!isUpload) {
-    document.getElementById("camera-box").style.display = "block";
     startCamera();
   } else {
     stopCamera();
   }
 }
 
-function handleFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+function toggleUploadMode() {
+  isMultiUpload = document.querySelector('input[name="upload-mode"]:checked').value === "multiple";
+  const fileInput = document.getElementById("file-input");
+  fileInput.value = "";
+  fileInput.multiple = isMultiUpload;
+  document.getElementById("upload-label-text").innerText = isMultiUpload ? "Choose multiple angle photos" : "Choose your photo";
+  selectedFiles = [];
+  document.getElementById("upload-preview").style.display = "none";
+  document.getElementById("find-button").disabled = true;
+}
 
-  selectedBlob = file;
-  const url = URL.createObjectURL(file);
-  document.getElementById("preview-image").src = url;
-  document.getElementById("upload-preview").style.display = "block";
+function toggleCamMode() {
+  isMultiCam = document.querySelector('input[name="cam-mode"]:checked').value === "multiple";
+  document.getElementById("camera-instruction").style.display = isMultiCam ? "block" : "none";
+  document.getElementById("capture-btn").innerText = isMultiCam ? "Capture Step 1 (Straight)" : "Capture Photo";
+  currentStepIndex = 0;
+  guidedBlobs = [];
+}
+
+function handleFileSelect(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  selectedFiles = files;
+  const previewContainer = document.getElementById("upload-preview");
+  previewContainer.innerHTML = "";
+  previewContainer.style.display = "block";
+
+  files.forEach(file => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    previewContainer.appendChild(img);
+  });
+
   document.getElementById("find-button").disabled = false;
-
   hideError();
-  hideAlert();
 }
 
 async function startCamera() {
   hideError();
-  hideAlert();
   try {
     stopCamera();
     cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
+      video: { facingMode: useFrontCamera ? "user" : "environment" },
       audio: false
     });
     document.getElementById("video").srcObject = cameraStream;
-  } catch (error) {
-    showError("Unable to access the camera. Please allow permissions or upload a photo.");
+  } catch (err) {
+    showError("Camera access denied or unavailable.");
   }
 }
 
 function stopCamera() {
   if (cameraStream) {
-    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream.getTracks().forEach(t => t.stop());
     cameraStream = null;
   }
 }
 
-function capturePhoto() {
+async function toggleCameraFacing() {
+  useFrontCamera = !useFrontCamera;
+  await startCamera();
+}
+
+function handleCaptureAction() {
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
-
-  if (!video.videoWidth || !video.videoHeight) {
+  if (!video.videoWidth) {
     showError("Please start the camera first.");
     return;
   }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
 
-  const context = canvas.getContext("2d");
-  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  canvas.toBlob(
-    function (blob) {
-      selectedBlob = blob;
-      document.getElementById("find-button").disabled = false;
-      document.getElementById("preview-image").src = URL.createObjectURL(blob);
+  canvas.toBlob(blob => {
+    if (!isMultiCam) {
+      selectedFiles = [blob];
+      document.getElementById("upload-preview").innerHTML = `<img src="${URL.createObjectURL(blob)}">`;
       document.getElementById("upload-preview").style.display = "block";
-      hideError();
-      hideAlert();
-    },
-    "image/jpeg",
-    0.92
-  );
+      document.getElementById("find-button").disabled = false;
+      showError("Snapshot captured successfully!");
+    } else {
+      guidedBlobs.push(blob);
+      currentStepIndex++;
+      if (currentStepIndex < guideSteps.length) {
+        document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
+        document.getElementById("capture-btn").innerText = `Capture Step ${currentStepIndex + 1} (${guideSteps[currentStepIndex].pose})`;
+      } else {
+        selectedFiles = guidedBlobs;
+        document.getElementById("camera-instruction").innerText = "Multi-angle sequence complete!";
+        document.getElementById("capture-btn").innerText = "Captured All Poses";
+        document.getElementById("capture-btn").disabled = true;
+        document.getElementById("find-button").disabled = false;
+        stopCamera();
+      }
+    }
+  }, "image/jpeg", 0.92);
 }
 
 function updateGallerySource() {
@@ -103,239 +145,87 @@ function getSelectedGalleryUrl() {
   return document.getElementById("gallery-url-input").value.trim();
 }
 
-function updateStageChecklist(progress, message) {
-  const setStage = (id, state, text) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (state === "done") {
-      el.innerHTML = `✓ <span style="color: #166534; font-weight: 600;">${text}</span>`;
-    } else if (state === "active") {
-      el.innerHTML = `● <span style="color: #1d4ed8; font-weight: 700;">${text}</span>`;
-    } else {
-      el.innerHTML = `○ <span style="color: #64748b;">${text}</span>`;
-    }
-  };
-
-  if (progress < 10) {
-    setStage("stage-received", "done", "Photo received");
-    setStage("stage-face", "active", "Detecting your face...");
-    setStage("stage-connect", "wait", "Connecting to Google Drive");
-    setStage("stage-download", "wait", "Downloading event photos");
-    setStage("stage-scan", "wait", "Scanning photos");
-    setStage("stage-match", "wait", "Finding your matches");
-  } else if (progress >= 10 && progress < 15) {
-    setStage("stage-received", "done", "Photo received");
-    setStage("stage-face", "done", "Face detected");
-    setStage("stage-connect", "active", "Connecting to Google Drive...");
-    setStage("stage-download", "wait", "Downloading event photos");
-    setStage("stage-scan", "wait", "Scanning photos");
-    setStage("stage-match", "wait", "Finding your matches");
-  } else if (progress >= 15 && progress < 30) {
-    setStage("stage-received", "done", "Photo received");
-    setStage("stage-face", "done", "Face detected");
-    setStage("stage-connect", "done", "Connected to Google Drive");
-    setStage("stage-download", "active", message || "Downloading event photos...");
-    setStage("stage-scan", "wait", "Scanning photos");
-    setStage("stage-match", "wait", "Finding your matches");
-  } else if (progress >= 30 && progress < 90) {
-    setStage("stage-received", "done", "Photo received");
-    setStage("stage-face", "done", "Face detected");
-    setStage("stage-connect", "done", "Connected to Google Drive");
-    setStage("stage-download", "done", "Photos downloaded successfully");
-    setStage("stage-scan", "active", message || "Scanning photos...");
-    setStage("stage-match", "wait", "Finding your matches");
-  } else {
-    setStage("stage-received", "done", "Photo received");
-    setStage("stage-face", "done", "Face detected");
-    setStage("stage-connect", "done", "Connected to Google Drive");
-    setStage("stage-download", "done", "Photos downloaded successfully");
-    setStage("stage-scan", "done", "Photos scanned");
-    setStage("stage-match", "active", message || "Finding your best matches...");
-  }
-}
-
 async function startSearch() {
   hideError();
-  hideAlert();
-
-  if (!selectedBlob) {
-    showError("Please upload or capture a photo first.");
+  if (!selectedFiles.length) {
+    showError("Please provide reference images first.");
     return;
   }
 
-  if (!API_BASE) {
-    showError("Backend URL is not configured in config.js.");
-    return;
-  }
-
-  const galleryUrl = getSelectedGalleryUrl();
-  const usingCustomGallery = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
-
-  if (usingCustomGallery) {
-    const drivePattern = /^https:\/\/drive\.google\.com\/drive\/folders\/[a-zA-Z0-9_-]+/;
-    if (!drivePattern.test(galleryUrl)) {
-      showError("Please paste a valid Google Drive folder link.");
-      return;
-    }
-  }
-
-  document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
-  document.getElementById("status-text").innerText = "Initializing search process...";
-  document.getElementById("progress-bar").style.width = "5%";
-  updateStageChecklist(5, "Initializing search process...");
 
-  await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+  const formData = new FormData();
+  selectedFiles.forEach((file, idx) => {
+    formData.append("selfies", file, `pose_${idx}.jpg`);
+  });
+
+  const galleryUrl = getSelectedGalleryUrl();
+  if (galleryUrl) {
+    formData.append("gallery_url", galleryUrl);
+  }
 
   try {
-    const formData = new FormData();
-    formData.append("selfie", selectedBlob, "selfie.jpg");
-
-    if (usingCustomGallery) {
-      formData.append("gallery_url", galleryUrl);
-    }
-
-    const response = await fetch(API_BASE + "/api/start-scan", {
-      method: "POST",
-      body: formData
-    });
-
-    if (!response.ok) throw new Error("Server rejected the request.");
-
-    const data = await response.json();
-    if (!data.success) throw new Error(data.message || "Failed to start scan.");
-
+    const res = await fetch(API_BASE + "/api/start-scan", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
     currentJobId = data.job_id;
     pollJob();
-  } catch (error) {
-    showError(error.message || "Connection failed.");
+  } catch (e) {
+    showError(e.message);
     resetToInput();
   }
 }
 
 async function pollJob() {
   try {
-    const response = await fetch(API_BASE + "/api/job/" + encodeURIComponent(currentJobId));
-    if (!response.ok) throw new Error("Lost connection to job queue.");
-
-    const job = await response.json();
-
-    const progress = job.progress || 0;
-    const message = job.message || "Processing photos...";
-
-    document.getElementById("status-text").innerText = message;
-    document.getElementById("progress-bar").style.width = progress + "%";
-    updateStageChecklist(progress, message);
-
-    if (job.message && job.message.includes("Note: Folder contains")) {
-      showAlert(job.message);
-    }
+    const res = await fetch(`${API_BASE}/api/job/${currentJobId}`);
+    const job = await res.json();
+    document.getElementById("status-text").innerText = job.message || "Processing...";
+    document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
 
     if (job.status === "completed") {
-      showResults(job);
-      return;
+      showResults(job.results);
+    } else if (job.status === "error") {
+      throw new Error(job.message);
+    } else {
+      setTimeout(pollJob, 500);
     }
-
-    if (job.status === "error") {
-      throw new Error(job.message || "Processing encountered an error.");
-    }
-
-    pollTimer = setTimeout(pollJob, 500);
-  } catch (error) {
-    showError(error.message || "An error occurred during search polling.");
+  } catch (e) {
+    showError(e.message);
     resetToInput();
   }
 }
 
-function resetToInput() {
-  if (pollTimer) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-  document.getElementById("status").style.display = "none";
-  document.getElementById("input-card").style.display = "block";
-  document.getElementById("find-button").disabled = false;
-}
-
-function showResults(job) {
+function showResults(results) {
   document.getElementById("status").style.display = "none";
   document.getElementById("results").style.display = "block";
-
-  const results = job.results || [];
-  document.getElementById("results-count").innerText = results.length + " matching photos found";
-
   const gallery = document.getElementById("gallery");
-  gallery.innerHTML = "";
+  gallery.innerHTML = results.length ? "" : '<div class="empty">No matching photos found.</div>';
 
-  if (results.length === 0) {
-    gallery.innerHTML = '<div class="empty">No matching photos found. Try a clearer selfie.</div>';
-    return;
-  }
-
-  results.forEach(function (item, index) {
-    const card = document.createElement("div");
-    card.className = "photo-card";
-
-    const image = document.createElement("img");
-    image.src = API_BASE + "/api/image/" + encodeURIComponent(currentJobId) + "/" + index;
-    image.loading = "lazy";
-    image.alt = "Matched photo";
-
-    const info = document.createElement("div");
-    info.className = "photo-info";
-
-    const name = document.createElement("div");
-    name.className = "photo-name";
-    name.innerText = item.file_name;
-
-    const download = document.createElement("a");
-    download.className = "download";
-    download.href = API_BASE + "/api/download/" + encodeURIComponent(currentJobId) + "/" + index;
-    download.innerText = "📥 Download Photo";
-    download.target = "_blank";
-
-    info.appendChild(name);
-    info.appendChild(download);
-    card.appendChild(image);
-    card.appendChild(info);
-    gallery.appendChild(card);
+  results.forEach((item, idx) => {
+    gallery.innerHTML += `
+      <div class="photo-card">
+        <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy">
+        <div class="photo-info">
+          <div class="photo-name">${item.file_name}</div>
+          <a class="download" href="${API_BASE}/api/download/${currentJobId}/${idx}" target="_blank">Download</a>
+        </div>
+      </div>`;
   });
 }
 
-function startAgain() {
-  document.getElementById("results").style.display = "none";
+function resetToInput() {
+  document.getElementById("status").style.display = "none";
   document.getElementById("input-card").style.display = "block";
-  document.getElementById("file-input").value = "";
-  selectedBlob = null;
-  currentJobId = null;
-  document.getElementById("find-button").disabled = true;
-  document.getElementById("upload-preview").style.display = "none";
-  document.querySelector('input[name="gallery-source"][value="default"]').checked = true;
-  document.getElementById("gallery-url-input").value = "";
-  updateGallerySource();
-  stopCamera();
-  switchTab("upload");
-  hideAlert();
-  hideError();
 }
 
-function showError(message) {
-  const element = document.getElementById("error");
-  element.innerText = message;
-  element.style.display = "block";
+function showError(msg) {
+  const el = document.getElementById("error");
+  el.innerText = msg;
+  el.style.display = "block";
 }
 
 function hideError() {
   document.getElementById("error").style.display = "none";
-}
-
-function showAlert(message) {
-  const element = document.getElementById("alert-box");
-  element.innerText = message;
-  element.style.display = "block";
-}
-
-function hideAlert() {
-  document.getElementById("alert-box").style.display = "none";
 }
