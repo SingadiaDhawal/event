@@ -287,7 +287,7 @@ function showResults(results) {
       <div class="photo-card">
         <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy" onclick="openLightbox('${API_BASE}/api/image/${currentJobId}/${idx}')">
         <div class="photo-info">
-          <div style="font-size:12px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file_name}">${item.file_name}</div>
+          <div style="font-size:11px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file_name}">${item.file_name}</div>
           <a class="download" href="${API_BASE}/api/download/${currentJobId}/${idx}" target="_blank">Download</a>
         </div>
       </div>`;
