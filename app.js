@@ -135,7 +135,7 @@ async function startSearch() {
   document.getElementById("status-text").innerText = "Connecting & checking folder index...";
   document.getElementById("progress-bar").style.width = "10%";
 
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
   try {
     const formData = new FormData();
