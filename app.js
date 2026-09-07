@@ -37,7 +37,7 @@ function toggleUploadMode() {
   isMultiUpload = document.querySelector('input[name="upload-mode"]:checked').value === "multiple";
   const fileInput = document.getElementById("file-input");
   fileInput.value = "";
-  fileInput.multiple = isMultiUpload;
+  fileInput.multiple = isMultiUpload; // Enables multi-select attribute dynamically
   document.getElementById("upload-label-text").innerText = isMultiUpload ? "Choose multiple angle photos" : "Choose your photo";
   selectedFiles = [];
   document.getElementById("upload-preview").style.display = "none";
@@ -208,7 +208,7 @@ function showResults(results) {
       <div class="photo-card">
         <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy">
         <div class="photo-info">
-          <div class="photo-name">${item.file_name}</div>
+          <div style="font-size:12px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.file_name}</div>
           <a class="download" href="${API_BASE}/api/download/${currentJobId}/${idx}" target="_blank">Download</a>
         </div>
       </div>`;
@@ -229,4 +229,3 @@ function showError(msg) {
 function hideError() {
   document.getElementById("error").style.display = "none";
 }
-

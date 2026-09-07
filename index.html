@@ -34,14 +34,15 @@ h1 { margin: 0 0 10px; font-size: clamp(30px, 6vw, 52px); letter-spacing: -1.5px
 .tab.active { background: #111827; color: white; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.mode-selector { margin-bottom: 15px; display: flex; gap: 15px; font-size: 14px; font-weight: 600; }
+.mode-selector { margin-bottom: 15px; display: flex; gap: 15px; font-size: 14px; font-weight: 600; color: #334155; }
 .upload-box {
   border: 2px dashed #cbd5e1; border-radius: 20px; padding: 35px 20px;
   text-align: center; cursor: pointer; transition: 0.2s; display: block;
 }
 .upload-box:hover { border-color: #6366f1; background: #f8fafc; }
+#file-input { display: none !important; }
 .preview { display: none; margin-top: 20px; text-align: center; }
-.preview img { max-width: 100%; max-height: 150px; border-radius: 12px; margin: 5px; display: inline-block; }
+.preview img { max-width: 100px; max-height: 100px; object-fit: cover; border-radius: 12px; margin: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: inline-block; }
 video { width: 100%; max-width: 600px; border-radius: 20px; background: #111827; }
 .camera-overlay { font-size: 18px; font-weight: 800; color: #4f46e5; margin-bottom: 10px; }
 button { border: 0; cursor: pointer; border-radius: 14px; padding: 13px 18px; font-size: 15px; font-weight: 800; }
@@ -73,7 +74,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   <section class="hero">
     <div class="logo">📸</div>
     <h1>Find Your Photos</h1>
-    <p class="subtitle">Upload or capture multi-angle images to achieve high-accuracy cross-profile matches.</p>
+    <p class="subtitle">Upload or capture multi-angle images for precise facial matching.</p>
   </section>
 
   <div class="card" id="input-card">
@@ -88,10 +89,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         <label><input type="radio" name="upload-mode" value="single" checked onchange="toggleUploadMode()"> Single Image</label>
         <label><input type="radio" name="upload-mode" value="multiple" onchange="toggleUploadMode()"> Multiple Images (Angles)</label>
       </div>
-      <label class="upload-box" for="file-input">
+      <div class="upload-box" onclick="document.getElementById('file-input').click()">
         <div style="font-size: 42px; margin-bottom: 12px;">🖼️</div>
         <div id="upload-label-text" style="font-size: 18px; font-weight: 800;">Choose your photo</div>
-      </label>
+        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Click to browse files from your device</div>
+      </div>
       <input id="file-input" type="file" accept="image/*">
       <div class="preview" id="upload-preview"></div>
     </div>
@@ -152,4 +154,3 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 <script src="app.js"></script>
 </body>
 </html>
-
