@@ -13,7 +13,7 @@
    broken binding can never silently disable every other button.
    ========================================================= */
 
-var API_BASE = String((window.CONFIG && CONFIG.BACKEND_URL) || "").replace(/\/+$/, "");
+var API_BASE = String((typeof CONFIG !== "undefined" && CONFIG.BACKEND_URL) || "").replace(/\/+$/, "");
 
 function $(id) { return document.getElementById(id); }
 
@@ -396,6 +396,39 @@ function getSelectedGalleryUrl() {
   return isCustom ? $("gallery-url-input").value.trim() : "";
 }
 
+/* ---------- SAFE FETCH ---------- */
+// Parses JSON only if the response actually looks like JSON. If the backend
+// (or the Cloudflare tunnel in front of it) returns an HTML error page, a
+// 404, or is simply offline, this throws a clear, human-readable error
+// instead of letting res.json() fail with "Unexpected token '<'".
+function fetchJson(url, options) {
+  return fetch(url, options).then(function (res) {
+    var contentType = res.headers.get("content-type") || "";
+    if (contentType.indexOf("application/json") === -1) {
+      if (res.status === 0) {
+        throw new Error("Can't reach the backend. Check your internet connection.");
+      }
+      throw new Error(
+        "Backend didn't return JSON (HTTP " + res.status + "). " +
+        "The Colab tunnel may be offline or the URL in config.js is stale — " +
+        "re-run the notebook and refresh this page."
+      );
+    }
+    return res.json().then(function (data) {
+      if (!res.ok && !("success" in data)) {
+        throw new Error(data.message || ("Request failed (HTTP " + res.status + ")."));
+      }
+      return data;
+    });
+  }).catch(function (err) {
+    if (err instanceof TypeError) {
+      // fetch() itself failed: DNS error, CORS block, tunnel fully down, etc.
+      throw new Error("Can't reach the backend at " + API_BASE + ". Check that the Colab notebook is still running.");
+    }
+    throw err;
+  });
+}
+
 /* ---------- SEARCH FLOW ---------- */
 function setProgress(pct, text) {
   var p = Math.max(0, Math.min(100, Math.round(pct || 0)));
@@ -407,6 +440,10 @@ function setProgress(pct, text) {
 
 function startSearch() {
   hideError();
+  if (!API_BASE) {
+    showError("Backend URL is not configured (config.js didn't load, or CONFIG.BACKEND_URL is empty). Check that config.js loads before app.js.");
+    return;
+  }
   if (!selectedFiles.length) { showError("Please add at least one reference photo first."); return; }
 
   var galleryUrl = getSelectedGalleryUrl();
@@ -427,8 +464,7 @@ function startSearch() {
   selectedFiles.forEach(function (file, idx) { formData.append("selfies", file, "pose_" + idx + ".jpg"); });
   if (galleryUrl) formData.append("gallery_url", galleryUrl);
 
-  fetch(API_BASE + "/api/start-scan", { method: "POST", body: formData })
-    .then(function (res) { return res.json(); })
+  fetchJson(API_BASE + "/api/start-scan", { method: "POST", body: formData })
     .then(function (data) {
       if (!data.success) throw new Error(data.message || "Could not start the scan.");
       currentJobId = data.job_id;
@@ -441,8 +477,7 @@ function startSearch() {
 }
 
 function pollJob() {
-  fetch(API_BASE + "/api/job/" + currentJobId)
-    .then(function (res) { return res.json(); })
+  fetchJson(API_BASE + "/api/job/" + currentJobId)
     .then(function (job) {
       setProgress(job.progress, job.message || "Matching faces across the gallery…");
       if (job.status === "completed") {
