@@ -1,10 +1,5 @@
 /* =========================================================
    Find Yourself — app logic
-   Backend contract is unchanged:
-     POST  {API_BASE}/api/start-scan        (FormData: selfies[], gallery_url?)
-     GET   {API_BASE}/api/job/{id}
-     GET   {API_BASE}/api/image/{id}/{idx}
-     GET   {API_BASE}/api/download/{id}/{idx}
    ========================================================= */
 
 const API_BASE = String((window.CONFIG && CONFIG.BACKEND_URL) || "").replace(/\/+$/, "");
@@ -30,7 +25,7 @@ function applyTheme(id, persist = true) {
   const theme = THEMES.find((t) => t.id === id) || THEMES[0];
   document.documentElement.setAttribute("data-theme", theme.id);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme.primary);
-  $("theme-name").textContent = theme.name;
+  if ($("theme-name")) $("theme-name").textContent = theme.name;
   if (persist) {
     try { localStorage.setItem(THEME_KEY, theme.id); } catch (_) {}
   }
@@ -39,6 +34,7 @@ function applyTheme(id, persist = true) {
 
 function renderThemeList() {
   const list = $("theme-list");
+  if (!list) return;
   const active = currentTheme();
   list.innerHTML = "";
   THEMES.forEach((t) => {
@@ -60,15 +56,16 @@ function renderThemeList() {
 }
 
 function openThemeMenu() {
-  $("theme-list").hidden = false;
-  $("theme-trigger").setAttribute("aria-expanded", "true");
+  if ($("theme-list")) $("theme-list").hidden = false;
+  $("theme-trigger")?.setAttribute("aria-expanded", "true");
 }
 function closeThemeMenu() {
-  $("theme-list").hidden = true;
-  $("theme-trigger").setAttribute("aria-expanded", "false");
+  if ($("theme-list")) $("theme-list").hidden = true;
+  $("theme-trigger")?.setAttribute("aria-expanded", "false");
 }
 function toggleThemeMenu() {
-  $("theme-list").hidden ? openThemeMenu() : closeThemeMenu();
+  const list = $("theme-list");
+  if (list) list.hidden ? openThemeMenu() : closeThemeMenu();
 }
 
 /* ---------- STATE ---------- */
@@ -92,16 +89,17 @@ let guidedBlobs = [];
 
 /* ---------- HELPERS ---------- */
 function setFindEnabled(enabled) {
-  $("find-button").disabled = !enabled;
+  if ($("find-button")) $("find-button").disabled = !enabled;
 }
 
 function show(el, on = true) {
-  el.classList.toggle("show", on);
+  if (el) el.classList.toggle("show", on);
 }
 
 let toastTimer;
 function toast(msg) {
   const el = $("toast");
+  if (!el) return;
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toastTimer);
@@ -110,6 +108,7 @@ function toast(msg) {
 
 function showError(msg) {
   const el = $("error");
+  if (!el) return;
   el.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span></span>`;
   el.querySelector("span").textContent = msg;
   show(el, true);
@@ -124,13 +123,14 @@ function escapeHtml(str) {
 /* ---------- TABS ---------- */
 function switchTab(tab) {
   const isUpload = tab === "upload";
-  $("upload-tab").classList.toggle("active", isUpload);
-  $("camera-tab").classList.toggle("active", !isUpload);
-  $("upload-tab").setAttribute("aria-selected", String(isUpload));
-  $("camera-tab").setAttribute("aria-selected", String(!isUpload));
-  $("upload-content").classList.toggle("active", isUpload);
-  $("camera-content").classList.toggle("active", !isUpload);
-  document.querySelector(".tabs").dataset.active = tab;
+  $("upload-tab")?.classList.toggle("active", isUpload);
+  $("camera-tab")?.classList.toggle("active", !isUpload);
+  $("upload-tab")?.setAttribute("aria-selected", String(isUpload));
+  $("camera-tab")?.setAttribute("aria-selected", String(!isUpload));
+  $("upload-content")?.classList.toggle("active", isUpload);
+  $("camera-content")?.classList.toggle("active", !isUpload);
+  const tabsContainer = document.querySelector(".tabs");
+  if (tabsContainer) tabsContainer.dataset.active = tab;
 
   if (!isUpload) startCamera();
   else stopCamera();
@@ -138,11 +138,15 @@ function switchTab(tab) {
 
 /* ---------- UPLOAD ---------- */
 function toggleUploadMode() {
-  isMultiUpload = document.querySelector('input[name="upload-mode"]:checked').value === "multiple";
+  const radio = document.querySelector('input[name="upload-mode"]:checked');
+  isMultiUpload = radio ? radio.value === "multiple" : false;
   const fileInput = $("file-input");
+  if (!fileInput) return;
   fileInput.value = "";
   fileInput.toggleAttribute("multiple", isMultiUpload);
-  $("upload-label-text").textContent = isMultiUpload ? "Choose photos from multiple angles" : "Choose your photo";
+  if ($("upload-label-text")) {
+    $("upload-label-text").textContent = isMultiUpload ? "Choose photos from multiple angles" : "Choose your photo";
+  }
   selectedFiles = [];
   renderUploadPreviews();
   setFindEnabled(false);
@@ -191,6 +195,7 @@ function buildPreviewItem({ src, label, onRemove, removeTitle }) {
 
 function renderUploadPreviews() {
   const container = $("upload-preview");
+  if (!container) return;
   container.innerHTML = "";
   container.classList.toggle("has-items", selectedFiles.length > 0);
 
@@ -211,6 +216,7 @@ function renderUploadPreviews() {
 /* ---------- CAMERA ---------- */
 function renderSteps() {
   const ol = $("cam-steps");
+  if (!ol) return;
   ol.hidden = !isMultiCam;
   ol.innerHTML = "";
   if (!isMultiCam) return;
@@ -225,25 +231,28 @@ function renderSteps() {
 
 function setInstruction(text) {
   const el = $("camera-instruction");
+  if (!el) return;
   el.hidden = !text;
   if (text) el.textContent = text;
 }
 
 function toggleCamMode() {
-  isMultiCam = document.querySelector('input[name="cam-mode"]:checked').value === "multiple";
+  const radio = document.querySelector('input[name="cam-mode"]:checked');
+  isMultiCam = radio ? radio.value === "multiple" : false;
   currentStepIndex = 0;
   guidedBlobs = [];
   selectedFiles = [];
   renderCamPreviews();
   renderSteps();
   setInstruction(isMultiCam ? guideSteps[0].label : "");
-  $("capture-btn").disabled = false;
+  if ($("capture-btn")) $("capture-btn").disabled = false;
   setFindEnabled(false);
   if (!cameraStream) startCamera();
 }
 
 function renderCamPreviews() {
   const container = $("cam-preview");
+  if (!container) return;
   container.innerHTML = "";
   container.classList.toggle("has-items", guidedBlobs.length > 0);
 
@@ -260,7 +269,7 @@ function renderCamPreviews() {
         renderSteps();
         if (isMultiCam) {
           setInstruction(guideSteps[currentStepIndex]?.label || "");
-          $("capture-btn").disabled = false;
+          if ($("capture-btn")) $("capture-btn").disabled = false;
           if (!cameraStream) startCamera();
         }
         if (!guidedBlobs.length) setFindEnabled(false);
@@ -277,8 +286,9 @@ async function startCamera() {
       video: { facingMode: useFrontCamera ? "user" : "environment", width: { ideal: 1280 }, height: { ideal: 1280 } },
       audio: false,
     });
-    $("video").srcObject = cameraStream;
-    document.querySelector(".viewfinder").classList.toggle("rear", !useFrontCamera);
+    if ($("video")) $("video").srcObject = cameraStream;
+    const vf = document.querySelector(".viewfinder");
+    if (vf) vf.classList.toggle("rear", !useFrontCamera);
   } catch (err) {
     showError("Camera access was denied or is unavailable. You can still upload photos instead.");
   }
@@ -298,6 +308,7 @@ async function toggleCameraFacing() {
 
 function flashViewfinder() {
   const f = $("vf-flash");
+  if (!f) return;
   f.classList.remove("on");
   void f.offsetWidth;
   f.classList.add("on");
@@ -306,7 +317,7 @@ function flashViewfinder() {
 function handleCaptureAction() {
   const video = $("video");
   const canvas = $("canvas");
-  if (!video.videoWidth) { showError("Camera is not ready yet. Please allow access and try again."); return; }
+  if (!video || !video.videoWidth) { showError("Camera is not ready yet. Please allow access and try again."); return; }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -337,7 +348,7 @@ function handleCaptureAction() {
     } else {
       selectedFiles = guidedBlobs;
       setInstruction("All angles captured");
-      $("capture-btn").disabled = true;
+      if ($("capture-btn")) $("capture-btn").disabled = true;
       setFindEnabled(true);
       stopCamera();
       toast("All 5 angles captured — ready to search");
@@ -347,22 +358,24 @@ function handleCaptureAction() {
 
 /* ---------- GALLERY SOURCE ---------- */
 function updateGallerySource() {
-  const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
-  $("custom-gallery-input").hidden = !isCustom;
-  if (isCustom) $("gallery-url-input").focus();
+  const radio = document.querySelector('input[name="gallery-source"]:checked');
+  const isCustom = radio ? radio.value === "custom" : false;
+  if ($("custom-gallery-input")) $("custom-gallery-input").hidden = !isCustom;
+  if (isCustom && $("gallery-url-input")) $("gallery-url-input").focus();
 }
 function getSelectedGalleryUrl() {
-  const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
-  return isCustom ? $("gallery-url-input").value.trim() : "";
+  const radio = document.querySelector('input[name="gallery-source"]:checked');
+  const isCustom = radio ? radio.value === "custom" : false;
+  return isCustom && $("gallery-url-input") ? $("gallery-url-input").value.trim() : "";
 }
 
 /* ---------- SEARCH FLOW ---------- */
 function setProgress(pct, text) {
   const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
-  $("progress-bar").style.width = p + "%";
-  $("progress-pct").textContent = p + "%";
-  $("progress").setAttribute("aria-valuenow", String(p));
-  if (text) $("status-text").textContent = text;
+  if ($("progress-bar")) $("progress-bar").style.width = p + "%";
+  if ($("progress-pct")) $("progress-pct").textContent = p + "%";
+  if ($("progress")) $("progress").setAttribute("aria-valuenow", String(p));
+  if (text && $("status-text")) $("status-text").textContent = text;
 }
 
 async function startSearch() {
@@ -370,14 +383,16 @@ async function startSearch() {
   if (!selectedFiles.length) { showError("Please add at least one reference photo first."); return; }
 
   const galleryUrl = getSelectedGalleryUrl();
-  const isCustom = document.querySelector('input[name="gallery-source"]:checked').value === "custom";
+  const radio = document.querySelector('input[name="gallery-source"]:checked');
+  const isCustom = radio ? radio.value === "custom" : false;
   if (isCustom && !galleryUrl) { showError("Please paste a Google Drive folder link, or switch to the event gallery."); return; }
 
-  const displayName = $("user-name").value.trim() || "Guest";
-  $("greeting-title").textContent = `Hello, ${displayName}!`;
-  $("user-avatar").textContent = displayName.charAt(0).toUpperCase();
+  const userNameInput = $("user-name");
+  const displayName = userNameInput && userNameInput.value.trim() ? userNameInput.value.trim() : "Guest";
+  if ($("greeting-title")) $("greeting-title").textContent = `Hello, ${displayName}!`;
+  if ($("user-avatar")) $("user-avatar").textContent = displayName.charAt(0).toUpperCase();
 
-  $("input-card").hidden = true;
+  if ($("input-card")) $("input-card").hidden = true;
   show($("status"), true);
   setProgress(0, "Uploading your reference images…");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -387,7 +402,7 @@ async function startSearch() {
   if (galleryUrl) formData.append("gallery_url", galleryUrl);
 
   try {
-    const res = await fetch(API_BASE + "/api/start-scan", { method: "POST", body: formData });
+    const res = await fetch(`${API_BASE}/api/start-scan`, { method: "POST", body: formData });
     const data = await res.json();
     if (!data.success) throw new Error(data.message || "Could not start the scan.");
     currentJobId = data.job_id;
@@ -418,10 +433,11 @@ function showResults(results) {
   hideError();
   show($("status"), false);
   show($("results"), true);
-  $("stats-badge").textContent = `${results.length} match${results.length === 1 ? "" : "es"}`;
-  $("download-all-btn").disabled = !results.length;
+  if ($("stats-badge")) $("stats-badge").textContent = `${results.length} match${results.length === 1 ? "" : "es"}`;
+  if ($("download-all-btn")) $("download-all-btn").disabled = !results.length;
 
   const gallery = $("gallery");
+  if (!gallery) return;
   gallery.innerHTML = "";
 
   if (!results.length) {
@@ -469,8 +485,8 @@ function downloadAllPhotos() {
 
 function startAgain() {
   show($("results"), false);
-  $("input-card").hidden = false;
-  $("file-input").value = "";
+  if ($("input-card")) $("input-card").hidden = false;
+  if ($("file-input")) $("file-input").value = "";
   selectedFiles = [];
   guidedBlobs = [];
   currentJobId = null;
@@ -480,7 +496,7 @@ function startAgain() {
   renderCamPreviews();
   renderSteps();
   setInstruction(isMultiCam ? guideSteps[0].label : "");
-  $("capture-btn").disabled = false;
+  if ($("capture-btn")) $("capture-btn").disabled = false;
   stopCamera();
   switchTab("upload");
   hideError();
@@ -489,21 +505,25 @@ function startAgain() {
 
 function resetToInput() {
   show($("status"), false);
-  $("input-card").hidden = false;
+  if ($("input-card")) $("input-card").hidden = false;
 }
 
 /* ---------- LIGHTBOX ---------- */
 let lastFocused = null;
 function openLightbox(src) {
   lastFocused = document.activeElement;
-  $("lightbox-img").src = src;
-  $("lightbox-modal").hidden = false;
+  const modalImg = $("lightbox-img");
+  const modal = $("lightbox-modal");
+  if (modalImg) modalImg.src = src;
+  if (modal) modal.hidden = false;
   document.body.style.overflow = "hidden";
-  $("lightbox-close").focus();
+  $("lightbox-close")?.focus?.();
 }
 function closeLightbox() {
-  $("lightbox-modal").hidden = true;
-  $("lightbox-img").src = "";
+  const modal = $("lightbox-modal");
+  const modalImg = $("lightbox-img");
+  if (modal) modal.hidden = true;
+  if (modalImg) modalImg.src = "";
   document.body.style.overflow = "";
   lastFocused?.focus?.();
 }
@@ -512,40 +532,50 @@ function closeLightbox() {
 function init() {
   // Theme
   applyTheme(currentTheme(), false);
-  $("theme-trigger").addEventListener("click", toggleThemeMenu);
-  document.addEventListener("click", (e) => { if (!$("theme-menu").contains(e.target)) closeThemeMenu(); });
+  $("theme-trigger")?.addEventListener("click", toggleThemeMenu);
+  document.addEventListener("click", (e) => {
+    const menu = $("theme-menu");
+    if (menu && !menu.contains(e.target)) closeThemeMenu();
+  });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeThemeMenu(); if (!$("lightbox-modal").hidden) closeLightbox(); }
+    if (e.key === "Escape") {
+      closeThemeMenu();
+      const modal = $("lightbox-modal");
+      if (modal && !modal.hidden) closeLightbox();
+    }
   });
 
   // Tabs
   document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
 
   // Upload
-  $("file-input").addEventListener("change", handleFileSelect);
+  if ($("file-input")) $("file-input").addEventListener("change", handleFileSelect);
   document.querySelectorAll('input[name="upload-mode"]').forEach((r) => r.addEventListener("change", toggleUploadMode));
   const dz = $("dropzone");
-  ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("is-over"); }));
-  ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("is-over"); }));
-  dz.addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) acceptFiles(e.dataTransfer.files); });
+  if (dz) {
+    ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("is-over"); }));
+    ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("is-over"); }));
+    dz.addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) acceptFiles(e.dataTransfer.files); });
+  }
 
   // Camera
   document.querySelectorAll('input[name="cam-mode"]').forEach((r) => r.addEventListener("change", toggleCamMode));
-  $("capture-btn").addEventListener("click", handleCaptureAction);
-  $("restart-cam-btn").addEventListener("click", startCamera);
-  $("flip-cam-btn").addEventListener("click", toggleCameraFacing);
+  if ($("capture-btn")) $("capture-btn").addEventListener("click", handleCaptureAction);
+  if ($("restart-cam-btn")) $("restart-cam-btn").addEventListener("click", startCamera);
+  if ($("flip-cam-btn")) $("flip-cam-btn").addEventListener("click", toggleCameraFacing);
 
   // Gallery source
   document.querySelectorAll('input[name="gallery-source"]').forEach((r) => r.addEventListener("change", updateGallerySource));
 
   // Actions
-  $("find-button").addEventListener("click", startSearch);
-  $("download-all-btn").addEventListener("click", downloadAllPhotos);
-  $("start-again-btn").addEventListener("click", startAgain);
+  if ($("find-button")) $("find-button").addEventListener("click", startSearch);
+  if ($("download-all-btn")) $("download-all-btn").addEventListener("click", downloadAllPhotos);
+  if ($("start-again-btn")) $("start-again-btn").addEventListener("click", startAgain);
 
   // Lightbox
-  $("lightbox-close").addEventListener("click", closeLightbox);
-  $("lightbox-modal").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeLightbox(); });
+  if ($("lightbox-close")) $("lightbox-close").addEventListener("click", closeLightbox);
+  const modal = $("lightbox-modal");
+  if (modal) modal.addEventListener("click", (e) => { if (e.target === e.currentTarget) closeLightbox(); });
 
   // Release camera when leaving the page
   window.addEventListener("pagehide", stopCamera);
