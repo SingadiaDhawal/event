@@ -6,11 +6,11 @@ let isMultiUpload = false;
 let isMultiCam = false;
 
 const guideSteps = [
-  { pose: "front", label: "Look Straight Ahead" },
-  { pose: "left", label: "Turn Slightly Left" },
-  { pose: "right", label: "Turn Slightly Right" },
-  { pose: "up", label: "Tilt Chin Up" },
-  { pose: "down", label: "Tilt Chin Down" }
+  { pose: "front", label: "Front Face" },
+  { pose: "left", label: "Left Profile" },
+  { pose: "right", label: "Right Profile" },
+  { pose: "up", label: "Looking Up" },
+  { pose: "down", label: "Looking Down" }
 ];
 let currentStepIndex = 0;
 let guidedBlobs = []; 
@@ -53,6 +53,9 @@ function toggleUploadMode() {
 function toggleCamMode() {
   isMultiCam = document.querySelector('input[name="cam-mode"]:checked').value === "multiple";
   document.getElementById("camera-instruction").style.display = isMultiCam ? "block" : "none";
+  if (isMultiCam) {
+    document.getElementById("camera-instruction").innerText = guideSteps[0].label;
+  }
   currentStepIndex = 0;
   guidedBlobs = [];
   document.getElementById("cam-preview").innerHTML = "";
@@ -80,12 +83,21 @@ function renderUploadPreviews() {
     item.className = "preview-item";
     
     const img = document.createElement("img");
-    img.src = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(file);
+    img.src = blobUrl;
+    img.onclick = () => openLightbox(blobUrl);
     
+    const badge = document.createElement("div");
+    badge.className = "preview-badge";
+    badge.innerText = `Image ${idx + 1}`;
+
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.innerText = "Remove";
-    btn.onclick = () => {
+    btn.className = "preview-delete";
+    btn.innerHTML = "&times;";
+    btn.title = "Remove image";
+    btn.onclick = (e) => {
+      e.stopPropagation();
       selectedFiles.splice(idx, 1);
       renderUploadPreviews();
       if (!selectedFiles.length) {
@@ -95,6 +107,7 @@ function renderUploadPreviews() {
     };
 
     item.appendChild(img);
+    item.appendChild(badge);
     item.appendChild(btn);
     container.appendChild(item);
   });
@@ -110,19 +123,30 @@ function renderCamPreviews() {
     item.className = "preview-item";
     
     const img = document.createElement("img");
-    img.src = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
+    img.src = blobUrl;
+    img.onclick = () => openLightbox(blobUrl);
     
+    const badge = document.createElement("div");
+    badge.className = "preview-badge";
+    badge.innerText = guideSteps[idx] ? guideSteps[idx].label : `Pose ${idx + 1}`;
+
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.innerText = "Retake";
-    btn.onclick = () => {
+    btn.className = "preview-delete";
+    btn.innerHTML = "&times;";
+    btn.title = "Retake pose";
+    btn.onclick = (e) => {
+      e.stopPropagation();
       guidedBlobs.splice(idx, 1);
       selectedFiles = guidedBlobs;
       currentStepIndex = guidedBlobs.length;
       renderCamPreviews();
       
-      if (isMultiCam && currentStepIndex < guideSteps.length) {
-        document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
+      if (isMultiCam) {
+        if (currentStepIndex < guideSteps.length) {
+          document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
+        }
         document.getElementById("capture-btn").disabled = false;
       }
       if (!guidedBlobs.length) {
@@ -131,6 +155,7 @@ function renderCamPreviews() {
     };
 
     item.appendChild(img);
+    item.appendChild(badge);
     item.appendChild(btn);
     container.appendChild(item);
   });
