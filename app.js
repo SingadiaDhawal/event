@@ -1,5 +1,5 @@
 // ============================================================
-// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC
+// EVENT PHOTO FINDER — MULTI-STAGE PROGRESS LOGIC
 // ============================================================
 
 let selectedBlob = null;
@@ -103,6 +103,57 @@ function getSelectedGalleryUrl() {
   return document.getElementById("gallery-url-input").value.trim();
 }
 
+function updateStageChecklist(progress, message) {
+  const setStage = (id, state, text) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (state === "done") {
+      el.innerHTML = `✓ <span style="color: #166534; font-weight: 600;">${text}</span>`;
+    } else if (state === "active") {
+      el.innerHTML = `● <span style="color: #1d4ed8; font-weight: 700;">${text}</span>`;
+    } else {
+      el.innerHTML = `○ <span style="color: #64748b;">${text}</span>`;
+    }
+  };
+
+  if (progress < 10) {
+    setStage("stage-received", "done", "Photo received");
+    setStage("stage-face", "active", "Detecting your face...");
+    setStage("stage-connect", "wait", "Connecting to Google Drive");
+    setStage("stage-download", "wait", "Downloading event photos");
+    setStage("stage-scan", "wait", "Scanning photos");
+    setStage("stage-match", "wait", "Finding your matches");
+  } else if (progress >= 10 && progress < 15) {
+    setStage("stage-received", "done", "Photo received");
+    setStage("stage-face", "done", "Face detected");
+    setStage("stage-connect", "active", "Connecting to Google Drive...");
+    setStage("stage-download", "wait", "Downloading event photos");
+    setStage("stage-scan", "wait", "Scanning photos");
+    setStage("stage-match", "wait", "Finding your matches");
+  } else if (progress >= 15 && progress < 30) {
+    setStage("stage-received", "done", "Photo received");
+    setStage("stage-face", "done", "Face detected");
+    setStage("stage-connect", "done", "Connected to Google Drive");
+    setStage("stage-download", "active", message || "Downloading event photos...");
+    setStage("stage-scan", "wait", "Scanning photos");
+    setStage("stage-match", "wait", "Finding your matches");
+  } else if (progress >= 30 && progress < 90) {
+    setStage("stage-received", "done", "Photo received");
+    setStage("stage-face", "done", "Face detected");
+    setStage("stage-connect", "done", "Connected to Google Drive");
+    setStage("stage-download", "done", "Photos downloaded successfully");
+    setStage("stage-scan", "active", message || "Scanning photos...");
+    setStage("stage-match", "wait", "Finding your matches");
+  } else {
+    setStage("stage-received", "done", "Photo received");
+    setStage("stage-face", "done", "Face detected");
+    setStage("stage-connect", "done", "Connected to Google Drive");
+    setStage("stage-download", "done", "Photos downloaded successfully");
+    setStage("stage-scan", "done", "Photos scanned");
+    setStage("stage-match", "active", message || "Finding your best matches...");
+  }
+}
+
 async function startSearch() {
   hideError();
   hideAlert();
@@ -128,12 +179,12 @@ async function startSearch() {
     }
   }
 
-  // Display loader immediately and yield control so the browser paints the UI changes
   document.getElementById("find-button").disabled = true;
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
-  document.getElementById("status-text").innerText = "Connecting & checking folder index...";
-  document.getElementById("progress-bar").style.width = "10%";
+  document.getElementById("status-text").innerText = "Initializing search process...";
+  document.getElementById("progress-bar").style.width = "5%";
+  updateStageChecklist(5, "Initializing search process...");
 
   await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
@@ -170,8 +221,12 @@ async function pollJob() {
 
     const job = await response.json();
 
-    document.getElementById("status-text").innerText = job.message || "Processing photos...";
-    document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
+    const progress = job.progress || 0;
+    const message = job.message || "Processing photos...";
+
+    document.getElementById("status-text").innerText = message;
+    document.getElementById("progress-bar").style.width = progress + "%";
+    updateStageChecklist(progress, message);
 
     if (job.message && job.message.includes("Note: Folder contains")) {
       showAlert(job.message);
