@@ -13,7 +13,7 @@ const guideSteps = [
   { pose: "down", label: "Tilt Chin Down" }
 ];
 let currentStepIndex = 0;
-let guidedBlobs = []; // Array of Blobs captured via camera sequence
+let guidedBlobs = []; 
 
 const API_BASE = String(CONFIG.BACKEND_URL || "").replace(/\/+$/, "");
 
@@ -53,10 +53,10 @@ function toggleUploadMode() {
 function toggleCamMode() {
   isMultiCam = document.querySelector('input[name="cam-mode"]:checked').value === "multiple";
   document.getElementById("camera-instruction").style.display = isMultiCam ? "block" : "none";
-  document.getElementById("capture-btn").innerText = isMultiCam ? "Capture Step 1 (Straight)" : "Capture Photo";
   currentStepIndex = 0;
   guidedBlobs = [];
   document.getElementById("cam-preview").innerHTML = "";
+  document.getElementById("capture-btn").disabled = false;
 }
 
 function handleFileSelect(event) {
@@ -64,36 +64,70 @@ function handleFileSelect(event) {
   if (!files.length) return;
 
   selectedFiles = files;
-  renderPreviewGrid(selectedFiles, "upload-preview", (idx) => {
-    selectedFiles.splice(idx, 1);
-    renderPreviewGrid(selectedFiles, "upload-preview", arguments.callee);
-    if (!selectedFiles.length) {
-      document.getElementById("upload-preview").style.display = "none";
-      document.getElementById("find-button").disabled = true;
-    }
-  });
+  renderUploadPreviews();
 
   document.getElementById("find-button").disabled = false;
   hideError();
 }
 
-function renderPreviewGrid(files, containerId, onRetake) {
-  const container = document.getElementById(containerId);
+function renderUploadPreviews() {
+  const container = document.getElementById("upload-preview");
   container.innerHTML = "";
-  container.style.display = files.length ? "flex" : "none";
+  container.style.display = selectedFiles.length ? "flex" : "none";
 
-  files.forEach((file, idx) => {
+  selectedFiles.forEach((file, idx) => {
     const item = document.createElement("div");
     item.className = "preview-item";
     
     const img = document.createElement("img");
-    img.src = file instanceof Blob || file instanceof File ? URL.createObjectURL(file) : file;
+    img.src = URL.createObjectURL(file);
     
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.innerText = "Retake/Remove";
+    btn.innerText = "Remove";
     btn.onclick = () => {
-      onRetake(idx);
+      selectedFiles.splice(idx, 1);
+      renderUploadPreviews();
+      if (!selectedFiles.length) {
+        document.getElementById("upload-preview").style.display = "none";
+        document.getElementById("find-button").disabled = true;
+      }
+    };
+
+    item.appendChild(img);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
+}
+
+function renderCamPreviews() {
+  const container = document.getElementById("cam-preview");
+  container.innerHTML = "";
+  container.style.display = guidedBlobs.length ? "flex" : "none";
+
+  guidedBlobs.forEach((blob, idx) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+    
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(blob);
+    
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.innerText = "Retake";
+    btn.onclick = () => {
+      guidedBlobs.splice(idx, 1);
+      selectedFiles = guidedBlobs;
+      currentStepIndex = guidedBlobs.length;
+      renderCamPreviews();
+      
+      if (isMultiCam && currentStepIndex < guideSteps.length) {
+        document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
+        document.getElementById("capture-btn").disabled = false;
+      }
+      if (!guidedBlobs.length) {
+        document.getElementById("find-button").disabled = true;
+      }
     };
 
     item.appendChild(img);
@@ -144,40 +178,25 @@ function handleCaptureAction() {
     if (!isMultiCam) {
       guidedBlobs = [blob];
       selectedFiles = guidedBlobs;
-      renderPreviewGrid(selectedFiles, "cam-preview", (idx) => {
-        guidedBlobs.splice(idx, 1);
-        selectedFiles = guidedBlobs;
-        renderPreviewGrid(selectedFiles, "cam-preview", arguments.callee);
-        document.getElementById("find-button").disabled = true;
-      });
+      renderCamPreviews();
       document.getElementById("find-button").disabled = false;
-      showError("Snapshot captured!");
+      showError("Snapshot captured successfully!");
     } else {
-      guidedBlobs.push(blob);
-      currentStepIndex++;
-      
-      renderPreviewGrid(guidedBlobs, "cam-preview", (idx) => {
-        guidedBlobs.splice(idx, 1);
-        currentStepIndex = guidedBlobs.length;
-        renderPreviewGrid(guidedBlobs, "cam-preview", arguments.callee);
+      if (currentStepIndex < guideSteps.length) {
+        guidedBlobs.push(blob);
+        currentStepIndex++;
+        
+        renderCamPreviews();
+
         if (currentStepIndex < guideSteps.length) {
           document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
-          document.getElementById("capture-btn").innerText = `Capture Step ${currentStepIndex + 1} (${guideSteps[currentStepIndex].pose})`;
-          document.getElementById("capture-btn").disabled = false;
+        } else {
+          selectedFiles = guidedBlobs;
+          document.getElementById("camera-instruction").innerText = "All angles captured!";
+          document.getElementById("capture-btn").disabled = true;
+          document.getElementById("find-button").disabled = false;
+          stopCamera();
         }
-        document.getElementById("find-button").disabled = true;
-      });
-
-      if (currentStepIndex < guideSteps.length) {
-        document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
-        document.getElementById("capture-btn").innerText = `Capture Step ${currentStepIndex + 1} (${guideSteps[currentStepIndex].pose})`;
-      } else {
-        selectedFiles = guidedBlobs;
-        document.getElementById("camera-instruction").innerText = "All angles captured!";
-        document.getElementById("capture-btn").innerText = "Sequence Complete";
-        document.getElementById("capture-btn").disabled = true;
-        document.getElementById("find-button").disabled = false;
-        stopCamera();
       }
     }
   }, "image/jpeg", 0.92);
@@ -202,7 +221,7 @@ async function startSearch() {
   }
 
   const rawName = document.getElementById("user-name").value.trim();
-  const displayName = rawName || "Traveler";
+  const displayName = rawName || "Guest";
   
   document.getElementById("greeting-title").innerText = `Hello, ${displayName}!`;
   document.getElementById("user-avatar").innerText = displayName.charAt(0).toUpperCase();
@@ -236,7 +255,7 @@ async function pollJob() {
   try {
     const res = await fetch(`${API_BASE}/api/job/${currentJobId}`);
     const job = await res.json();
-    document.getElementById("status-text").innerText = job.message || "Processing...";
+    document.getElementById("status-text").innerText = job.message || "Processing scans...";
     document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
 
     if (job.status === "completed") {
@@ -261,14 +280,14 @@ function showResults(results) {
   document.getElementById("stats-badge").innerText = `${results.length} Matches Found`;
   
   const gallery = document.getElementById("gallery");
-  gallery.innerHTML = results.length ? "" : '<div class="empty" style="grid-column: 1/-1; text-align:center; color:#94a3b8; padding:40px;">No matching photos found. Try adding more face angles.</div>';
+  gallery.innerHTML = results.length ? "" : '<div class="empty" style="grid-column: 1/-1; text-align:center; color:#64748b; padding:40px;">No matching photos found. Try uploading additional face angles.</div>';
 
   results.forEach((item, idx) => {
     gallery.innerHTML += `
       <div class="photo-card">
         <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy" onclick="openLightbox('${API_BASE}/api/image/${currentJobId}/${idx}')">
         <div class="photo-info">
-          <div style="font-size:12px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file_name}">${item.file_name}</div>
+          <div style="font-size:12px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file_name}">${item.file_name}</div>
           <a class="download" href="${API_BASE}/api/download/${currentJobId}/${idx}" target="_blank">Download</a>
         </div>
       </div>`;
