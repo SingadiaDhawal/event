@@ -1,5 +1,5 @@
 // ============================================================
-// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC (WITH ALERTS)
+// EVENT PHOTO FINDER — FULLY CORRECTED FRONTEND LOGIC
 // ============================================================
 
 let selectedBlob = null;
@@ -167,10 +167,10 @@ async function pollJob() {
 
     const job = await response.json();
 
+    // Dynamically update UI progress bar and status text from backend states
     document.getElementById("status-text").innerText = job.message || "Processing photos...";
     document.getElementById("progress-bar").style.width = (job.progress || 0) + "%";
 
-    // Handle truncation warnings sent from backend
     if (job.message && job.message.includes("Note: Folder contains")) {
       showAlert(job.message);
     }
@@ -184,7 +184,7 @@ async function pollJob() {
       throw new Error(job.message || "Processing encountered an error.");
     }
 
-    pollTimer = setTimeout(pollJob, 600);
+    pollTimer = setTimeout(pollJob, 500);
   } catch (error) {
     showError(error.message || "An error occurred during search polling.");
     resetToInput();
