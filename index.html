@@ -89,11 +89,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         <label><input type="radio" name="upload-mode" value="single" checked onchange="toggleUploadMode()"> Single Image</label>
         <label><input type="radio" name="upload-mode" value="multiple" onchange="toggleUploadMode()"> Multiple Images (Angles)</label>
       </div>
-      <div class="upload-box" onclick="document.getElementById('file-input').click()">
+      <label class="upload-box" for="file-input">
         <div style="font-size: 42px; margin-bottom: 12px;">🖼️</div>
         <div id="upload-label-text" style="font-size: 18px; font-weight: 800;">Choose your photo</div>
         <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Click to browse files from your device</div>
-      </div>
+      </label>
+      <!-- Ensure file-input does not have display:none inline which blocks click dispatching through labels on some mobile systems -->
       <input id="file-input" type="file" accept="image/*">
       <div class="preview" id="upload-preview"></div>
     </div>

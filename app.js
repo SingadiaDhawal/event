@@ -37,7 +37,14 @@ function toggleUploadMode() {
   isMultiUpload = document.querySelector('input[name="upload-mode"]:checked').value === "multiple";
   const fileInput = document.getElementById("file-input");
   fileInput.value = "";
-  fileInput.multiple = isMultiUpload; // Enables multi-select attribute dynamically
+  
+  // Explicitly apply multi attribute to allow selecting multiple files in native explorer
+  if (isMultiUpload) {
+    fileInput.setAttribute("multiple", "multiple");
+  } else {
+    fileInput.removeAttribute("multiple");
+  }
+
   document.getElementById("upload-label-text").innerText = isMultiUpload ? "Choose multiple angle photos" : "Choose your photo";
   selectedFiles = [];
   document.getElementById("upload-preview").style.display = "none";
