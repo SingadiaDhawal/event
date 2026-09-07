@@ -13,7 +13,7 @@ const guideSteps = [
   { pose: "down", label: "Tilt Chin Down" }
 ];
 let currentStepIndex = 0;
-let guidedBlobs = [];
+let guidedBlobs = []; // Array of Blobs captured via camera sequence
 
 const API_BASE = String(CONFIG.BACKEND_URL || "").replace(/\/+$/, "");
 
@@ -38,7 +38,6 @@ function toggleUploadMode() {
   const fileInput = document.getElementById("file-input");
   fileInput.value = "";
   
-  // Explicitly apply multi attribute to allow selecting multiple files in native explorer
   if (isMultiUpload) {
     fileInput.setAttribute("multiple", "multiple");
   } else {
@@ -57,6 +56,7 @@ function toggleCamMode() {
   document.getElementById("capture-btn").innerText = isMultiCam ? "Capture Step 1 (Straight)" : "Capture Photo";
   currentStepIndex = 0;
   guidedBlobs = [];
+  document.getElementById("cam-preview").innerHTML = "";
 }
 
 function handleFileSelect(event) {
@@ -64,18 +64,42 @@ function handleFileSelect(event) {
   if (!files.length) return;
 
   selectedFiles = files;
-  const previewContainer = document.getElementById("upload-preview");
-  previewContainer.innerHTML = "";
-  previewContainer.style.display = "block";
-
-  files.forEach(file => {
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(file);
-    previewContainer.appendChild(img);
+  renderPreviewGrid(selectedFiles, "upload-preview", (idx) => {
+    selectedFiles.splice(idx, 1);
+    renderPreviewGrid(selectedFiles, "upload-preview", arguments.callee);
+    if (!selectedFiles.length) {
+      document.getElementById("upload-preview").style.display = "none";
+      document.getElementById("find-button").disabled = true;
+    }
   });
 
   document.getElementById("find-button").disabled = false;
   hideError();
+}
+
+function renderPreviewGrid(files, containerId, onRetake) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  container.style.display = files.length ? "flex" : "none";
+
+  files.forEach((file, idx) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+    
+    const img = document.createElement("img");
+    img.src = file instanceof Blob || file instanceof File ? URL.createObjectURL(file) : file;
+    
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.innerText = "Retake/Remove";
+    btn.onclick = () => {
+      onRetake(idx);
+    };
+
+    item.appendChild(img);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
 }
 
 async function startCamera() {
@@ -118,21 +142,39 @@ function handleCaptureAction() {
 
   canvas.toBlob(blob => {
     if (!isMultiCam) {
-      selectedFiles = [blob];
-      document.getElementById("upload-preview").innerHTML = `<img src="${URL.createObjectURL(blob)}">`;
-      document.getElementById("upload-preview").style.display = "block";
+      guidedBlobs = [blob];
+      selectedFiles = guidedBlobs;
+      renderPreviewGrid(selectedFiles, "cam-preview", (idx) => {
+        guidedBlobs.splice(idx, 1);
+        selectedFiles = guidedBlobs;
+        renderPreviewGrid(selectedFiles, "cam-preview", arguments.callee);
+        document.getElementById("find-button").disabled = true;
+      });
       document.getElementById("find-button").disabled = false;
-      showError("Snapshot captured successfully!");
+      showError("Snapshot captured!");
     } else {
       guidedBlobs.push(blob);
       currentStepIndex++;
+      
+      renderPreviewGrid(guidedBlobs, "cam-preview", (idx) => {
+        guidedBlobs.splice(idx, 1);
+        currentStepIndex = guidedBlobs.length;
+        renderPreviewGrid(guidedBlobs, "cam-preview", arguments.callee);
+        if (currentStepIndex < guideSteps.length) {
+          document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
+          document.getElementById("capture-btn").innerText = `Capture Step ${currentStepIndex + 1} (${guideSteps[currentStepIndex].pose})`;
+          document.getElementById("capture-btn").disabled = false;
+        }
+        document.getElementById("find-button").disabled = true;
+      });
+
       if (currentStepIndex < guideSteps.length) {
         document.getElementById("camera-instruction").innerText = guideSteps[currentStepIndex].label;
         document.getElementById("capture-btn").innerText = `Capture Step ${currentStepIndex + 1} (${guideSteps[currentStepIndex].pose})`;
       } else {
         selectedFiles = guidedBlobs;
-        document.getElementById("camera-instruction").innerText = "Multi-angle sequence complete!";
-        document.getElementById("capture-btn").innerText = "Captured All Poses";
+        document.getElementById("camera-instruction").innerText = "All angles captured!";
+        document.getElementById("capture-btn").innerText = "Sequence Complete";
         document.getElementById("capture-btn").disabled = true;
         document.getElementById("find-button").disabled = false;
         stopCamera();
@@ -158,6 +200,12 @@ async function startSearch() {
     showError("Please provide reference images first.");
     return;
   }
+
+  const rawName = document.getElementById("user-name").value.trim();
+  const displayName = rawName || "Traveler";
+  
+  document.getElementById("greeting-title").innerText = `Hello, ${displayName}!`;
+  document.getElementById("user-avatar").innerText = displayName.charAt(0).toUpperCase();
 
   document.getElementById("input-card").style.display = "none";
   document.getElementById("status").style.display = "block";
@@ -204,22 +252,64 @@ async function pollJob() {
   }
 }
 
+let cachedResults = [];
+
 function showResults(results) {
+  cachedResults = results;
   document.getElementById("status").style.display = "none";
   document.getElementById("results").style.display = "block";
+  document.getElementById("stats-badge").innerText = `${results.length} Matches Found`;
+  
   const gallery = document.getElementById("gallery");
-  gallery.innerHTML = results.length ? "" : '<div class="empty">No matching photos found.</div>';
+  gallery.innerHTML = results.length ? "" : '<div class="empty" style="grid-column: 1/-1; text-align:center; color:#94a3b8; padding:40px;">No matching photos found. Try adding more face angles.</div>';
 
   results.forEach((item, idx) => {
     gallery.innerHTML += `
       <div class="photo-card">
-        <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy">
+        <img src="${API_BASE}/api/image/${currentJobId}/${idx}" loading="lazy" onclick="openLightbox('${API_BASE}/api/image/${currentJobId}/${idx}')">
         <div class="photo-info">
-          <div style="font-size:12px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.file_name}</div>
+          <div style="font-size:12px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file_name}">${item.file_name}</div>
           <a class="download" href="${API_BASE}/api/download/${currentJobId}/${idx}" target="_blank">Download</a>
         </div>
       </div>`;
   });
+}
+
+function openLightbox(imgSrc) {
+  const modal = document.getElementById("lightbox-modal");
+  const modalImg = document.getElementById("lightbox-img");
+  modal.style.display = "flex";
+  modalImg.src = imgSrc;
+}
+
+function closeLightbox() {
+  document.getElementById("lightbox-modal").style.display = "none";
+}
+
+function downloadAllPhotos() {
+  cachedResults.forEach((item, idx) => {
+    const link = document.createElement('a');
+    link.href = `${API_BASE}/api/download/${currentJobId}/${idx}`;
+    link.download = item.file_name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
+function startAgain() {
+  document.getElementById("results").style.display = "none";
+  document.getElementById("input-card").style.display = "block";
+  document.getElementById("file-input").value = "";
+  selectedFiles = [];
+  guidedBlobs = [];
+  currentJobId = null;
+  document.getElementById("find-button").disabled = true;
+  document.getElementById("upload-preview").style.display = "none";
+  document.getElementById("cam-preview").style.display = "none";
+  stopCamera();
+  switchTab("upload");
+  hideError();
 }
 
 function resetToInput() {
