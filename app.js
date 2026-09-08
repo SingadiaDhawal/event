@@ -532,18 +532,10 @@ function showResults(results) {
 }
 
 function downloadAllPhotos() {
-  if (!cachedResults.length) return;
-  toast("Downloading " + cachedResults.length + " photo" + (cachedResults.length > 1 ? "s" : "") + "…");
-  cachedResults.forEach(function (item, idx) {
-    setTimeout(function () {
-      var link = document.createElement("a");
-      link.href = API_BASE + "/api/download/" + currentJobId + "/" + idx;
-      link.download = item.file_name || ("photo_" + (idx + 1) + ".jpg");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }, idx * 250);
-  });
+  if (!cachedResults || !cachedResults.length) return;
+  toast("Zipping your matched photos...");
+  var zipUrl = API_BASE + "/api/download-all/" + currentJobId;
+  window.open(zipUrl, "_blank");
 }
 
 function startAgain() {
